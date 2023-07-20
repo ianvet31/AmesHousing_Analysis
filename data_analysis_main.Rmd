@@ -1,0 +1,47 @@
+---
+title: "Data Analysis - Ames House Prices"
+author: "Ian Vetter"
+date: "2023-07-20"
+output: html_document
+---
+
+# The Dataset
+
+
+```{r}
+housing_data = read.csv("C:\\Users\\ianve\\Desktop\\data_analysis_proj\\dataset\\AmesHousing.csv")
+
+summary(housing_data)
+
+nrow(housing_data)
+ncol(housing_data)
+
+```
+
+First few examples:
+
+```{r}
+housing_data$SalePrice[1:10]
+housing_data$Lot.Area[1:10]
+housing_data$Utilities[1:10]
+```
+
+
+
+# Basic Regression Models
+
+```{r}
+
+sapply(lapply(housing_data, unique), length)
+
+
+# lm() complains when it runs into "NA" values in dataframe, so just replacing any with 0 for now...
+housing_data[is.na(housing_data)] <- 0
+
+
+
+full_additive = lm(SalePrice ~ ., data = housing_data)
+summary(full_additive)
+```
+
+

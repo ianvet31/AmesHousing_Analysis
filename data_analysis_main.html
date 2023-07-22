@@ -9,7 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Ian Vetter" />
+<meta name="author" content="Team: Random85" />
 
 <meta name="date" content="2023-07-20" />
 
@@ -351,15 +351,52 @@ display: none;
 
 
 <h1 class="title toc-ignore">Data Analysis - Ames House Prices</h1>
-<h4 class="author">Ian Vetter</h4>
+<h4 class="author">Team: Random85</h4>
 <h4 class="date">2023-07-20</h4>
 
 </div>
 
 
-<div id="the-dataset" class="section level1">
-<h1>The Dataset</h1>
-<pre class="r"><code>housing_data = read.csv(&quot;C:\\Users\\ianve\\Desktop\\data_analysis_proj\\dataset\\AmesHousing.csv&quot;)
+<!--The Proposal section is for temporary it will be removed in final submission of the project-->
+<div id="data-analysis-project-proposal" class="section level3">
+<h3><strong>Data Analysis Project Proposal</strong></h3>
+<p><strong>1. The names of the students who will be contributing to the
+group project.</strong></p>
+<p>Ian Vetter - ivette2 Thomas Richter - thomasr8 Vivek Patel -
+vivekdp2</p>
+<p><strong>2. A tentative title for the project.</strong></p>
+<p>An examination of trends in Ames, Iowa housing prices</p>
+<p><strong>3. Description of the data file (what they contain including
+number of variables and number of records). You do not necessarily have
+to list all the variables, but at least mention those of greatest
+importance.?</strong></p>
+<p>We’ll be analyzing a dataset of residential home prices and
+attributes in Ames, Iowa. This dataset features a healthy combination of
+79 numeric and categorical variables, with around 3000 unique training
+examples. For the response variable, we’ll aim to model the numeric
+SalePrice feature as a function of some of the most notable predictors,
+including lot area, year built, utilities, # of full and half baths,
+etc.</p>
+<p><strong>4. Background information on the data sets, including
+specific citation of their source (so that I can also access
+it).</strong></p>
+<p>The Ames housing dataset was assembled by Dean De Cock, and featured
+in a recent Kaggle data analysis competition:</p>
+<p><a href="https://www.kaggle.com/datasets/prevek18/ames-housing-dataset" class="uri">https://www.kaggle.com/datasets/prevek18/ames-housing-dataset</a></p>
+<p><strong>5. A brief statement of the business, science, research, or
+personal interest you have in the data set which you hope to
+explore.</strong></p>
+<p>One of our members, Tom, is looking to buy a home in the near future.
+Finding key indicators of housing price sounds fascinating and
+potentially very helpful!</p>
+<p><strong>6. Evidence that the data can be loaded into R. Load the
+data, and print the first few values of the response variable as
+evidence.</strong></p>
+<p><a href="https://github.com/ianvet31/AmesHousing_Analysis/blob/main/Data%20Analysis%20-%20MD.pdf" class="uri">https://github.com/ianvet31/AmesHousing_Analysis/blob/main/Data%20Analysis%20-%20MD.pdf</a></p>
+</div>
+<div id="the-dataset" class="section level3">
+<h3><strong>The Dataset</strong></h3>
+<pre class="r"><code>housing_data = read.csv(&quot;AmesHousing.csv&quot;)
 
 summary(housing_data)</code></pre>
 <pre><code>##      Order             PID             MS.SubClass      MS.Zoning        

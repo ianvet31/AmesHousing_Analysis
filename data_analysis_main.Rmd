@@ -1,15 +1,48 @@
 ---
 title: "Data Analysis - Ames House Prices"
-author: "Ian Vetter"
+author: "Team: Random85"
 date: "2023-07-20"
 output: html_document
 ---
 
-# The Dataset
+<!--The Proposal section is for temporary it will be removed in final submission of the project-->
+### **Data Analysis Project Proposal**
+
+**1. The names of the students who will be contributing to the group project.**
+
+Ian Vetter - ivette2
+Thomas Richter - thomasr8
+Vivek Patel - vivekdp2
+
+**2. A tentative title for the project.**
+
+An examination of trends in Ames, Iowa housing prices
+
+**3. Description of the data file (what they contain including number of variables and number of records). You do not necessarily have to list all the variables, but at least mention those of greatest importance.?**
+
+We’ll be analyzing a dataset of residential home prices and attributes in Ames, Iowa. This dataset features a healthy combination of 79 numeric and categorical variables, with around 3000 unique training examples. For the response variable, we’ll aim to model the numeric SalePrice feature as a function of some of the most notable predictors, including lot area, year built, utilities, # of full and half baths, etc. 
+
+**4. Background information on the data sets, including specific citation of their source (so that I can also access it).**
+
+The Ames housing dataset was assembled by Dean De Cock, and featured in a recent Kaggle data analysis competition:
+
+https://www.kaggle.com/datasets/prevek18/ames-housing-dataset
+
+**5. A brief statement of the business, science, research, or personal interest you have in the data set which you hope to explore.**
+
+One of our members, Tom, is looking to buy a home in the near future. Finding key indicators of housing price sounds fascinating and potentially very helpful!
+
+**6. Evidence that the data can be loaded into R. Load the data, and print the first few values of the response variable as evidence.**
+
+https://github.com/ianvet31/AmesHousing_Analysis/blob/main/Data%20Analysis%20-%20MD.pdf
+
+
+
+### **The Dataset**
 
 
 ```{r}
-housing_data = read.csv("C:\\Users\\ianve\\Desktop\\data_analysis_proj\\dataset\\AmesHousing.csv")
+housing_data = read.csv("AmesHousing.csv")
 
 summary(housing_data)
 

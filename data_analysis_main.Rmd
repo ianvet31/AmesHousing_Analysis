@@ -7,8 +7,11 @@ output: html_document
 
 # The Dataset
 
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
 
-```{r, warning=FALSE}
+```{r}
 library(faraway)
 library(dplyr)
 library(psych)
@@ -28,23 +31,21 @@ ncol(housing_data)
 # Using small chunk of dataset for quick testing :)
 
 #housing_data = housing_data[1:100,]
-#str(housing_data)
 
 # Coercing categorical predictors into factor variables
 
-housing_data$MS.Zoning = as.factor(housing_data$MS.Zoning)
-housing_data$Street = as.factor(housing_data$Street)
-housing_data$Lot.Shape = as.factor(housing_data$Lot.Shape)
-housing_data$Land.Contour = as.factor(housing_data$Land.Contour)
-housing_data$Utilities = as.factor(housing_data$Utilities)
-housing_data$Lot.Config = as.factor(housing_data$Lot.Config)
-housing_data$Land.Slope = as.factor(housing_data$Land.Slope)
-housing_data$Bldg.Type = as.factor(housing_data$Bldg.Type)
-housing_data$House.Style = as.factor(housing_data$House.Style)
-housing_data$Roof.Style = as.factor(housing_data$Roof.Style)
-housing_data$Foundation = as.factor(housing_data$Foundation)
+housing_data[is.na(housing_data)] = 1
 
-str(housing_data)
+for (i in 1:ncol(housing_data)) {
+  if (typeof(housing_data[, i]) == "character") {
+    if (length(unique(housing_data[, i])) >= 2) {
+      housing_data[, i] = as.factor(housing_data[, i])
+    }
+    
+  }
+}
+
+#str(housing_data)
 ```
 
 First few examples:
@@ -66,12 +67,18 @@ housing_data$Utilities[1:10]
 n_idxs = unlist(lapply(housing_data, is.numeric), use.names = FALSE)  
 numeric_housing_data = housing_data[, n_idxs]
 
-str(numeric_housing_data)
+#str(numeric_housing_data)
+
+
 
 # MUST specify use = "complete.obs" argument to ignore NA's in dataset
 corrs = round(cor(numeric_housing_data, use="complete.obs"), 2)
-corrplot(corrs, method="number")
-ggcorrplot(corrs, lab_size = 0.1)
+
+
+# some possible correlation plots?
+
+#corrplot(corrs, method="number")
+#ggcorrplot(corrs, lab_size = 0.1)
 
 #corrs
 
@@ -109,18 +116,100 @@ While some of these high correlation measures are to be expected, such as house 
 
 # Basic Regression Models
 
-```{r}
+We'll start out with a few preliminary multiple regression models: A full additive model using all available predictors, a reduced additive model that disregards some of the predictors that exhibit collinearity or low significance, and a backwards AIC-selected model.
 
+```{r, results='hide'}
 #sapply(lapply(housing_data, unique), length)
 
 
 # lm() complains when it runs into "NA" values in dataframe, so just replacing any with 0 for now...
-housing_data[is.na(housing_data)] <- 0
-
 
 
 full_additive = lm(SalePrice ~ ., data = housing_data)
-summary(full_additive)
+
+additive_lowcorr = lm(SalePrice ~ . - Gr.Liv.Area - Garage.Cars - Total.Bsmt.SF - Garage.Yr.Blt - Order - MS.Zoning - Condition.1 - House.Style - Exterior.1st - Exterior.2nd - Bsmt.Qual - Exter.Cond - Bsmt.Cond - Bsmt.Exposure - BsmtFin.Type.2 - Heating - Electrical - Garage.Type, data = housing_data)
+
+additive_aic = step(additive_lowcorr, direction = "backward")
 
 ```
+
+```{r}
+
+anova(additive_lowcorr, full_additive)
+anova(additive_aic, full_additive)
+
+```
+
+# Transformations
+
+```{r}
+par(mfrow = c(2, 2))    
+
+plot(SalePrice ~ Lot.Area, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs Lot area")
+
+plot(SalePrice ~ X1st.Flr.SF, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs First floor area")
+
+plot(SalePrice ~ X2nd.Flr.SF, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs Second floor area")
+
+plot(SalePrice ~ Garage.Area, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs Garage area")
+```
+
+```{r}
+
+par(mfrow = c(2, 2))    
+
+plot(SalePrice ~ Total.Bsmt.SF, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs Basement area")
+
+plot(SalePrice ~ Lot.Frontage, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs Lot frontage")
+
+plot(SalePrice ~ Overall.Qual, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs Overall quality")
+
+
+plot(SalePrice ~ Overall.Cond, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs Overall condition")
+```
+
+```{r}
+
+par(mfrow = c(2, 2))   
+
+plot(SalePrice ~ Gr.Liv.Area, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs Living area")
+
+plot(SalePrice ~ Full.Bath, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs # of full bathrooms")
+
+plot(SalePrice ~ MS.SubClass, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs MS Subclass")
+
+plot(SalePrice ~ Wood.Deck.SF, data = housing_data, col = "grey", pch = 20, cex = 1.5,
+     main = "Sale price vs Deck area")
+```
+
+```{r}
+#log_p1 = lm(SalePrice ~ . + log(X1st.Flr.SF) + log(Garage.Area) + log(Lot.Frontage), data=housing_data)
+
+log_r1 = lm(log(SalePrice) ~ ., data = housing_data)
+
+#summary(log_p1)
+summary(log_r1)
+```
+
+
+# Interactions
+
+```{r}
+
+#int_mod1 = lm(SalePrice ~ (.)^2, data = housing_data)
+```
+
+
+
 

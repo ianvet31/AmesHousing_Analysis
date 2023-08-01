@@ -8,14 +8,43 @@ output: html_document
 # The Dataset
 
 
-```{r}
-housing_data = read.csv("C:\\Users\\ianve\\Desktop\\data_analysis_proj\\dataset\\AmesHousing.csv")
+```{r, warning=FALSE}
+library(faraway)
+library(dplyr)
+library(psych)
+library(corrplot)
+library(ggplot2)
+library(ggcorrplot)
+library(lares)
+library(reshape2)
+
+housing_data = read.csv("dataset\\AmesHousing.csv")
 
 summary(housing_data)
 
 nrow(housing_data)
 ncol(housing_data)
 
+# Using small chunk of dataset for quick testing :)
+
+#housing_data = housing_data[1:100,]
+#str(housing_data)
+
+# Coercing categorical predictors into factor variables
+
+housing_data$MS.Zoning = as.factor(housing_data$MS.Zoning)
+housing_data$Street = as.factor(housing_data$Street)
+housing_data$Lot.Shape = as.factor(housing_data$Lot.Shape)
+housing_data$Land.Contour = as.factor(housing_data$Land.Contour)
+housing_data$Utilities = as.factor(housing_data$Utilities)
+housing_data$Lot.Config = as.factor(housing_data$Lot.Config)
+housing_data$Land.Slope = as.factor(housing_data$Land.Slope)
+housing_data$Bldg.Type = as.factor(housing_data$Bldg.Type)
+housing_data$House.Style = as.factor(housing_data$House.Style)
+housing_data$Roof.Style = as.factor(housing_data$Roof.Style)
+housing_data$Foundation = as.factor(housing_data$Foundation)
+
+str(housing_data)
 ```
 
 First few examples:
@@ -27,12 +56,62 @@ housing_data$Utilities[1:10]
 ```
 
 
+# Collinearity and correlation analysis
+
+
+```{r}
+
+# Subsetting all the numeric elements of the dataset for collinearity and correlation analysis:
+
+n_idxs = unlist(lapply(housing_data, is.numeric), use.names = FALSE)  
+numeric_housing_data = housing_data[, n_idxs]
+
+str(numeric_housing_data)
+
+# MUST specify use = "complete.obs" argument to ignore NA's in dataset
+corrs = round(cor(numeric_housing_data, use="complete.obs"), 2)
+corrplot(corrs, method="number")
+ggcorrplot(corrs, lab_size = 0.1)
+
+#corrs
+
+ggplot(melt(corrs), aes(Var1, Var2, fill=value)) +
+  geom_tile(height=0.9, width=0.9) +
+  scale_fill_gradient2(low="blue", mid="white", high="red") +
+  theme_minimal() +
+  coord_equal() +
+  labs(x="",y="",fill="Corr") +
+  theme(axis.text.x=element_text(size=5, angle=45, vjust=1, hjust=1, 
+                                 margin=margin(-3,0,0,0)),
+        axis.text.y=element_text(size=5, margin=margin(0,-3,0,0)),
+        panel.grid.major=element_blank()) 
+
+```
+
+Taking a closer look at some of the most correlated predictors:
+
+```{r}
+
+corr_cross(numeric_housing_data,
+  max_pvalue = 0.05,
+  top = 15 
+)
+
+# A few of these further visualized in pairs:
+
+corr_data = numeric_housing_data[, c("Order", "Yr.Sold", "Garage.Cars", "Garage.Area", "Year.Built", "Garage.Yr.Blt", "Gr.Liv.Area", "TotRms.AbvGrd", "Overall.Qual", "Total.Bsmt.SF", "SalePrice")]
+
+pairs(corr_data, col = "dodgerblue")
+```
+
+While some of these high correlation measures are to be expected, such as house year built along garage year built, we can also see some non-trivial patterns start to emerge from the more continuous numeric predictors.
+
 
 # Basic Regression Models
 
 ```{r}
 
-sapply(lapply(housing_data, unique), length)
+#sapply(lapply(housing_data, unique), length)
 
 
 # lm() complains when it runs into "NA" values in dataframe, so just replacing any with 0 for now...
@@ -42,6 +121,6 @@ housing_data[is.na(housing_data)] <- 0
 
 full_additive = lm(SalePrice ~ ., data = housing_data)
 summary(full_additive)
-```
 
+```
 

@@ -1,6 +1,6 @@
 ---
 title: "Data Analysis - Ames House Prices"
-author: "Ian Vetter"
+author: "Random85"
 date: "2023-07-20"
 output: html_document
 ---
@@ -11,7 +11,7 @@ output: html_document
 knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
 
-```{r}
+```{r, warning=FALSE}
 library(faraway)
 library(dplyr)
 library(psych)
@@ -23,7 +23,7 @@ library(reshape2)
 
 housing_data = read.csv("dataset\\AmesHousing.csv")
 
-summary(housing_data)
+# summary(housing_data)
 
 nrow(housing_data)
 ncol(housing_data)
@@ -45,7 +45,9 @@ for (i in 1:ncol(housing_data)) {
   }
 }
 
-#str(housing_data)
+housing_data$Yr.Sold = as.factor(housing_data$Yr.Sold)
+
+str(housing_data)
 ```
 
 First few examples:
@@ -57,6 +59,29 @@ housing_data$Utilities[1:10]
 ```
 
 
+Dropping some of the columns that are not useful as a predictor for sale price.
+
+```{r}
+# Dropping the order and PID, looks like this is just for record keeping
+housing_data = subset(housing_data, select = -c(Order, PID))
+
+# Removing lot fraontage area, since we have lot area. Frontage is measurement of the house start to the street. It has way more null values
+housing_data = subset(housing_data, select = -c(Lot.Frontage))
+
+# Removing alley because we have street data
+housing_data = subset(housing_data, select = -c(Alley))
+
+# removing one condition column and exterior
+housing_data = subset(housing_data, select = -c(Condition.2, Exterior.2nd))
+
+```
+
+```{r, eval=FALSE}
+View(housing_data)
+```
+
+
+
 # Collinearity and correlation analysis
 
 
@@ -65,7 +90,8 @@ housing_data$Utilities[1:10]
 # Subsetting all the numeric elements of the dataset for collinearity and correlation analysis:
 
 n_idxs = unlist(lapply(housing_data, is.numeric), use.names = FALSE)  
-numeric_housing_data = housing_data[, n_idxs]
+all_numeric_housing_data = housing_data[, n_idxs]
+numeric_housing_data = subset(all_numeric_housing_data, select = -c(SalePrice))
 
 #str(numeric_housing_data)
 
@@ -105,42 +131,141 @@ corr_cross(numeric_housing_data,
 )
 
 # A few of these further visualized in pairs:
+names(numeric_housing_data)
 
-corr_data = numeric_housing_data[, c("Order", "Yr.Sold", "Garage.Cars", "Garage.Area", "Year.Built", "Garage.Yr.Blt", "Gr.Liv.Area", "TotRms.AbvGrd", "Overall.Qual", "Total.Bsmt.SF", "SalePrice")]
-
-pairs(corr_data, col = "dodgerblue")
+# pairs(numeric_housing_data, col = "dodgerblue")
 ```
 
 While some of these high correlation measures are to be expected, such as house year built along garage year built, we can also see some non-trivial patterns start to emerge from the more continuous numeric predictors.
 
 
-# Basic Regression Models
+# Models (VP)
 
-We'll start out with a few preliminary multiple regression models: A full additive model using all available predictors, a reduced additive model that disregards some of the predictors that exhibit collinearity or low significance, and a backwards AIC-selected model.
+```{r}
+#Functions to evaluate models
+library(lmtest)
 
-```{r, results='hide'}
-#sapply(lapply(housing_data, unique), length)
+get_bp_decision = function(model, alpha) {
+  decide = unname(bptest(model)$p.value < alpha)
+  ifelse(decide, "Reject", "Fail to Reject")
+}
+
+get_sw_decision = function(model, alpha) {
+  decide = unname(shapiro.test(resid(model))$p.value < alpha)
+  ifelse(decide, "Reject", "Fail to Reject")
+}
+
+get_num_params = function(model) {
+  length(coef(model))
+}
+
+get_loocv_rmse = function(model) {
+  sqrt(mean((resid(model) / (1 - hatvalues(model))) ^ 2,na.rm=TRUE))
+}
+
+get_adj_r2 = function(model) {
+  summary(model)$adj.r.squared
+}
+```
 
 
-# lm() complains when it runs into "NA" values in dataframe, so just replacing any with 0 for now...
 
+### Location of the house could play a big role in house price, but for the dataset that is used, it has total 28 neighbors as follow:
 
-full_additive = lm(SalePrice ~ ., data = housing_data)
+```{r}
+length(unique(housing_data[, "Neighborhood"]))
+```
 
-additive_lowcorr = lm(SalePrice ~ . - Gr.Liv.Area - Garage.Cars - Total.Bsmt.SF - Garage.Yr.Blt - Order - MS.Zoning - Condition.1 - House.Style - Exterior.1st - Exterior.2nd - Bsmt.Qual - Exter.Cond - Bsmt.Cond - Bsmt.Exposure - BsmtFin.Type.2 - Heating - Electrical - Garage.Type, data = housing_data)
+### We don't need this big list of dummy variable, so creating new variable as location based on some important factor
 
-additive_aic = step(additive_lowcorr, direction = "backward")
+```{r}
+# first converting the some exterior variables to numeric and then using it:
+levels(housing_data[,"Exter.Cond"])
+levels(housing_data[,"Exter.Qual"])
+levels(housing_data[,"Functional"])
+
+housing_data$Exter.Cond.Num = 5 - as.numeric(housing_data[, "Exter.Cond"])
+housing_data$Exter.Qual.Num = 4 - as.numeric(housing_data[, "Exter.Qual"])
+housing_data$Functional.Num = ifelse(housing_data[,"Functional"] == "Maj1", 8, 
+                                     ifelse(housing_data[,"Functional"] == "Maj2", 7, 
+                                            ifelse(housing_data[,"Functional"] == "Min1", 6,
+                                                   ifelse(housing_data[,"Functional"] == "Min2", 5, 
+                                                          ifelse(housing_data[,"Functional"] == "Mod", 4,
+                                                                 ifelse(housing_data[,"Functional"] == "Typ", 3,
+                                                                        ifelse(housing_data[,"Functional"] == "Sev", 2,
+                                                                               ifelse(housing_data[,"Functional"] == "Sal", 1, 0))))))))
+
+housing_data$Location = (housing_data[,"Overall.Qual"] / mean(housing_data[,"Overall.Qual"])) +
+                        (housing_data[,"Overall.Cond"] / mean(housing_data[,"Overall.Cond"])) +
+                        (housing_data[,"Exter.Cond.Num"] / mean(housing_data[,"Exter.Cond.Num"])) + 
+                        (housing_data[,"Exter.Qual.Num"] / mean(housing_data[,"Exter.Qual.Num"])) +
+                        (housing_data[,"Functional.Num"] / mean(housing_data[,"Functional.Num"]))
+
+summary(housing_data[,"Location"])
+```
+### Make sure that location is corelated to saleprice and positive:
+
+```{r}
+cor(housing_data[,c("Location","SalePrice")])
+```
+### It has weak but a positive relation of with saleprice.
+
+### Taking most relevant predictors that are logically be useful to build saleprice model with existing knowledge of real estate.
+```{r}
+# this model removes some of the qualities variable because it has some condition of those variables present
+# Such as, keeping Bsmt.Cond and removing Bsmt.Qual (because both factor has almost same levels)
+
+saleprice_full_model_selected = lm(SalePrice ~ MS.Zoning + Lot.Area + Street + Lot.Shape + Land.Contour + Utilities + Lot.Config + Land.Slope + Condition.1  + House.Style + Year.Built + Foundation + Location + Roof.Style + Exterior.1st + Total.Bsmt.SF + Bsmt.Cond + Bsmt.Full.Bath + Heating + Central.Air + Electrical + X1st.Flr.SF + X2nd.Flr.SF + Gr.Liv.Area + Full.Bath + Half.Bath + Bedroom.AbvGr + Kitchen.AbvGr + Kitchen.Qual + TotRms.AbvGrd + Fireplaces + Garage.Area + Paved.Drive + Wood.Deck.SF  + Open.Porch.SF + Pool.Area + Fence + Misc.Val + Mo.Sold + Yr.Sold, data = housing_data)
+
+saleprice_additive_model = lm(SalePrice ~ ., data = housing_data)
+
+saleprice_selected_backward_aic = step(saleprice_full_model_selected, direction = "backward", trace = 0)
 
 ```
+
+
+```{r}
+# check the number of predictors in the model
+length(coef(saleprice_full_model_selected)) - 1
+length(coef(saleprice_selected_backward_aic)) - 1
+```
+
+### Testing the built model
+```{r}
+get_loocv_rmse(saleprice_additive_model)
+get_loocv_rmse(saleprice_full_model_selected)
+get_loocv_rmse(saleprice_selected_backward_aic)
+```
+### Even though removing so many variables, the model is still very huge, so, removing some of the variables that are may be corelated. Also, removing the variables that seems related based on the common real estate knowledge.
 
 ```{r}
 
-anova(additive_lowcorr, full_additive)
-anova(additive_aic, full_additive)
+saleprice_full_model_selected_reduced = lm(SalePrice ~ MS.Zoning + Lot.Area + Street + Lot.Shape + Utilities + Land.Slope + House.Style + Year.Built + Foundation + Location + Heating + Central.Air + Electrical + Gr.Liv.Area + Full.Bath + Bedroom.AbvGr + Kitchen.AbvGr + Kitchen.Qual + TotRms.AbvGrd + Fireplaces + Garage.Area + Paved.Drive + Wood.Deck.SF  + Open.Porch.SF + Pool.Area + Fence + Misc.Val + Yr.Sold  , data = housing_data)
 
+saleprice_selected_reduced_backward_aic = step(saleprice_full_model_selected_reduced, direction = "backward", trace = 0)
+
+summary(saleprice_selected_reduced_backward_aic)
 ```
 
-# Transformations
+```{r}
+# temp
+length(coef(saleprice_full_model_selected_reduced)) - 1
+length(coef(saleprice_selected_reduced_backward_aic)) - 1
+```
+
+### Testing the built model
+```{r}
+get_loocv_rmse(saleprice_additive_model)
+get_loocv_rmse(saleprice_full_model_selected_reduced)
+get_loocv_rmse(saleprice_selected_reduced_backward_aic)
+```
+
+```{r}
+anova(saleprice_full_model_selected_reduced, saleprice_selected_reduced_backward_aic)
+```
+
+
+# For Transformations analyzing the data
 
 ```{r}
 par(mfrow = c(2, 2))    
@@ -164,9 +289,6 @@ par(mfrow = c(2, 2))
 
 plot(SalePrice ~ Total.Bsmt.SF, data = housing_data, col = "grey", pch = 20, cex = 1.5,
      main = "Sale price vs Basement area")
-
-plot(SalePrice ~ Lot.Frontage, data = housing_data, col = "grey", pch = 20, cex = 1.5,
-     main = "Sale price vs Lot frontage")
 
 plot(SalePrice ~ Overall.Qual, data = housing_data, col = "grey", pch = 20, cex = 1.5,
      main = "Sale price vs Overall quality")
@@ -193,22 +315,8 @@ plot(SalePrice ~ Wood.Deck.SF, data = housing_data, col = "grey", pch = 20, cex 
      main = "Sale price vs Deck area")
 ```
 
-```{r}
-#log_p1 = lm(SalePrice ~ . + log(X1st.Flr.SF) + log(Garage.Area) + log(Lot.Frontage), data=housing_data)
-
-log_r1 = lm(log(SalePrice) ~ ., data = housing_data)
-
-#summary(log_p1)
-summary(log_r1)
-```
 
 
-# Interactions
-
-```{r}
-
-#int_mod1 = lm(SalePrice ~ (.)^2, data = housing_data)
-```
 
 
 

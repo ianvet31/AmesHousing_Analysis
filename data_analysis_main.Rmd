@@ -2,7 +2,9 @@
 title: "Data Analysis - Ames House Prices"
 author: "Random85"
 date: "2023-07-20"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 # The Dataset

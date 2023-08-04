@@ -22,6 +22,7 @@ library(ggplot2)
 library(ggcorrplot)
 library(lares)
 library(reshape2)
+library(scales)
 
 housing_data = read.csv("dataset\\AmesHousing.csv")
 
@@ -76,6 +77,81 @@ housing_data = subset(housing_data, select = -c(Alley))
 # removing one condition column and exterior
 housing_data = subset(housing_data, select = -c(Condition.2, Exterior.2nd))
 
+```
+
+### Location of the house could play a big role in house price, but for the dataset that is used, it has total 28 neighbors as follow:
+
+```{r}
+length(unique(housing_data[, "Neighborhood"]))
+```
+
+### We don't need this big list of dummy variable, so creating new variable as location based on some important factor
+
+```{r}
+# first converting the some exterior variables to numeric and then using it:
+levels(housing_data[,"Exter.Cond"])
+levels(housing_data[,"Exter.Qual"])
+levels(housing_data[,"Functional"])
+
+housing_data$Exter.Cond.Num = 5 - as.numeric(housing_data[, "Exter.Cond"])
+housing_data$Exter.Qual.Num = 4 - as.numeric(housing_data[, "Exter.Qual"])
+housing_data$Functional.Num = ifelse(housing_data[,"Functional"] == "Maj1", 8, 
+                                     ifelse(housing_data[,"Functional"] == "Maj2", 7, 
+                                            ifelse(housing_data[,"Functional"] == "Min1", 6,
+                                                   ifelse(housing_data[,"Functional"] == "Min2", 5, 
+                                                          ifelse(housing_data[,"Functional"] == "Mod", 4,
+                                                                 ifelse(housing_data[,"Functional"] == "Typ", 3,
+                                                                        ifelse(housing_data[,"Functional"] == "Sev", 2,
+                                                                               ifelse(housing_data[,"Functional"] == "Sal", 1, 0))))))))
+
+housing_data$Location = (housing_data[,"Overall.Qual"] / mean(housing_data[,"Overall.Qual"])) +
+                        (housing_data[,"Overall.Cond"] / mean(housing_data[,"Overall.Cond"])) +
+                        (housing_data[,"Exter.Cond.Num"] / mean(housing_data[,"Exter.Cond.Num"])) + 
+                        (housing_data[,"Exter.Qual.Num"] / mean(housing_data[,"Exter.Qual.Num"])) +
+                        (housing_data[,"Functional.Num"] / mean(housing_data[,"Functional.Num"]))
+
+summary(housing_data[,"Location"])
+```
+
+### Converting ranked columns from factor to numeric
+
+```{r}
+#Function to convert Qual/Cond values into a numeric scale
+convert_rank= function(col) {
+col=replace(col,col=="Ex",values=5)
+col=replace(col,col=="Gd",values=4 )
+col=replace(col,col=="TA",values=3 )
+col=replace(col,col=="Fa",values=2 )
+col=replace(col,col=="Po",values=1 )
+col=replace(col,col=="",values=0 )
+as.numeric(col)
+}
+```
+```{r}
+#Create Numeric Columns for the rank
+#Convert Bsmt Columns
+#housing_data$Bsmt.Qual.Num=convert_rank(as.character(housing_data$Bsmt.Qual))
+#housing_data$Bsmt.Cond.Num=convert_rank(as.character(housing_data$Bsmt.Cond))
+#Convert Garage Columns
+#housing_data$Garage.Cond.Num=convert_rank(as.character(housing_data$Garage.Cond))
+#housing_data$Garage.Qual.Num=convert_rank(as.character(housing_data$Garage.Qual))
+#Convert Exterior Columns
+housing_data$Exter.Cond.Num=convert_rank(as.character(housing_data$Exter.Cond))
+housing_data$Exter.Qual.Num=convert_rank(as.character(housing_data$Exter.Qual))
+#Test equality after rank conversion
+Ex=housing_data$Exter.Cond=="Gd"
+test=housing_data$Exter.Cond.Num==4
+#all.equal(Ex,test)
+```
+
+
+
+```{r}
+#Now that data cleaning is done, we split Test and Train data
+set.seed(720)
+ames_trn_idx = sample(nrow(housing_data), size = trunc(0.80 * nrow(housing_data)))
+ames_trn_data = housing_data[ames_trn_idx, ]
+ames_tst_data = housing_data[-ames_trn_idx, ]
 ```
 
 ```{r, eval=FALSE}
@@ -169,43 +245,33 @@ get_loocv_rmse = function(model) {
 get_adj_r2 = function(model) {
   summary(model)$adj.r.squared
 }
+
+compute_rmse = function(model) {
+  sqrt(mean(resid(model)^2))
+}
+
+get_avg_per_error = function(model,newdata=ames_tst_data) {
+  predicted = predict(model, newdata = newdata)
+  n = nrow(newdata)
+  error = abs(newdata$SalePrice - predicted)
+  avg_per_error = ((1 / n) * (sum(error / predicted))) * 100
+  avg_per_error
+}
+
+pred_graph= function(model,main="Predicted Vs. Actual") {
+  predicted = predict(model, newdata = ames_tst_data)
+  plot(
+  ames_tst_data$SalePrice,
+  predicted,
+  ylab = "Predicted Price ($)",
+  xlab = "Actual Price ($)",
+  col = "blue",
+  main = main
+  )
+  abline(a = 0, b = 1, lwd = 2)
+}
 ```
 
-
-
-### Location of the house could play a big role in house price, but for the dataset that is used, it has total 28 neighbors as follow:
-
-```{r}
-length(unique(housing_data[, "Neighborhood"]))
-```
-
-### We don't need this big list of dummy variable, so creating new variable as location based on some important factor
-
-```{r}
-# first converting the some exterior variables to numeric and then using it:
-levels(housing_data[,"Exter.Cond"])
-levels(housing_data[,"Exter.Qual"])
-levels(housing_data[,"Functional"])
-
-housing_data$Exter.Cond.Num = 5 - as.numeric(housing_data[, "Exter.Cond"])
-housing_data$Exter.Qual.Num = 4 - as.numeric(housing_data[, "Exter.Qual"])
-housing_data$Functional.Num = ifelse(housing_data[,"Functional"] == "Maj1", 8, 
-                                     ifelse(housing_data[,"Functional"] == "Maj2", 7, 
-                                            ifelse(housing_data[,"Functional"] == "Min1", 6,
-                                                   ifelse(housing_data[,"Functional"] == "Min2", 5, 
-                                                          ifelse(housing_data[,"Functional"] == "Mod", 4,
-                                                                 ifelse(housing_data[,"Functional"] == "Typ", 3,
-                                                                        ifelse(housing_data[,"Functional"] == "Sev", 2,
-                                                                               ifelse(housing_data[,"Functional"] == "Sal", 1, 0))))))))
-
-housing_data$Location = (housing_data[,"Overall.Qual"] / mean(housing_data[,"Overall.Qual"])) +
-                        (housing_data[,"Overall.Cond"] / mean(housing_data[,"Overall.Cond"])) +
-                        (housing_data[,"Exter.Cond.Num"] / mean(housing_data[,"Exter.Cond.Num"])) + 
-                        (housing_data[,"Exter.Qual.Num"] / mean(housing_data[,"Exter.Qual.Num"])) +
-                        (housing_data[,"Functional.Num"] / mean(housing_data[,"Functional.Num"]))
-
-summary(housing_data[,"Location"])
-```
 ### Make sure that location is corelated to saleprice and positive:
 
 ```{r}
@@ -218,15 +284,37 @@ cor(housing_data[,c("Location","SalePrice")])
 # this model removes some of the qualities variable because it has some condition of those variables present
 # Such as, keeping Bsmt.Cond and removing Bsmt.Qual (because both factor has almost same levels)
 
-saleprice_full_model_selected = lm(SalePrice ~ MS.Zoning + Lot.Area + Street + Lot.Shape + Land.Contour + Utilities + Lot.Config + Land.Slope + Condition.1  + House.Style + Year.Built + Foundation + Location + Roof.Style + Exterior.1st + Total.Bsmt.SF + Bsmt.Cond + Bsmt.Full.Bath + Heating + Central.Air + Electrical + X1st.Flr.SF + X2nd.Flr.SF + Gr.Liv.Area + Full.Bath + Half.Bath + Bedroom.AbvGr + Kitchen.AbvGr + Kitchen.Qual + TotRms.AbvGrd + Fireplaces + Garage.Area + Paved.Drive + Wood.Deck.SF  + Open.Porch.SF + Pool.Area + Fence + Misc.Val + Mo.Sold + Yr.Sold, data = housing_data)
+saleprice_full_model_selected = lm(SalePrice ~ MS.Zoning + Lot.Area + Street + Lot.Shape + Land.Contour + Utilities + Lot.Config + Land.Slope + Condition.1  + House.Style + Year.Built + Foundation + Location + Roof.Style + Exterior.1st + Total.Bsmt.SF + Bsmt.Cond + Bsmt.Full.Bath + Heating + Central.Air + Electrical + X1st.Flr.SF + X2nd.Flr.SF + Gr.Liv.Area + Full.Bath + Half.Bath + Bedroom.AbvGr + Kitchen.AbvGr + Kitchen.Qual + TotRms.AbvGrd + Fireplaces + Garage.Area + Paved.Drive + Wood.Deck.SF  + Open.Porch.SF + Pool.Area + Fence + Misc.Val + Mo.Sold + Yr.Sold, data = ames_trn_data)
 
-saleprice_additive_model = lm(SalePrice ~ ., data = housing_data)
+saleprice_additive_model = lm(SalePrice ~ ., data = ames_trn_data)
 
 saleprice_selected_backward_aic = step(saleprice_full_model_selected, direction = "backward", trace = 0)
 
 ```
 
 
+```{r}
+# check the number of predictors in the model
+length(coef(saleprice_full_model_selected)) - 1
+length(coef(saleprice_selected_backward_aic)) - 1
+```
+### Forward BIC Model - Full Additive Scope
+```{r}
+#Create BIC Forward model with Scope as full Additive
+saleprice_additive_model = lm(SalePrice ~ ., data = ames_trn_data)
+form_add=update(formula(saleprice_additive_model),.~.-Misc.Feature)
+start=lm(SalePrice ~ 1,data=ames_trn_data)
+n=nrow(ames_trn_data)
+bic_for_mod=step(start,direction = "forward",scope = form_add ,k=log(n),trace=0)
+```
+
+### Taking most relevant predictors that are logically be useful to build saleprice model with existing knowledge of real estate.
+```{r}
+# this model removes some of the qualities variable because it has some condition of those variables present
+# Such as, keeping Bsmt.Cond and removing Bsmt.Qual (because both factor has almost same levels)
+saleprice_full_model_selected = lm(SalePrice ~ MS.Zoning + Lot.Area + Street + Lot.Shape + Land.Contour + Utilities + Lot.Config + Land.Slope + Condition.1  + House.Style + Year.Built + Foundation + Location + Roof.Style + Exterior.1st + Total.Bsmt.SF + Bsmt.Cond + Bsmt.Full.Bath + Heating + Central.Air + Electrical + X1st.Flr.SF + X2nd.Flr.SF + Gr.Liv.Area + Full.Bath + Half.Bath + Bedroom.AbvGr + Kitchen.AbvGr + Kitchen.Qual + TotRms.AbvGrd + Fireplaces + Garage.Area + Paved.Drive + Wood.Deck.SF  + Open.Porch.SF + Pool.Area + Fence + Misc.Val + Mo.Sold + Yr.Sold, data = ames_trn_data)
+saleprice_selected_backward_aic = step(saleprice_full_model_selected, direction = "backward", trace = 0)
+```
 ```{r}
 # check the number of predictors in the model
 length(coef(saleprice_full_model_selected)) - 1
@@ -241,9 +329,10 @@ get_loocv_rmse(saleprice_selected_backward_aic)
 ```
 ### Even though removing so many variables, the model is still very huge, so, removing some of the variables that are may be corelated. Also, removing the variables that seems related based on the common real estate knowledge.
 
+
 ```{r}
 
-saleprice_full_model_selected_reduced = lm(SalePrice ~ MS.Zoning + Lot.Area + Street + Lot.Shape + Utilities + Land.Slope + House.Style + Year.Built + Foundation + Location + Heating + Central.Air + Electrical + Gr.Liv.Area + Full.Bath + Bedroom.AbvGr + Kitchen.AbvGr + Kitchen.Qual + TotRms.AbvGrd + Fireplaces + Garage.Area + Paved.Drive + Wood.Deck.SF  + Open.Porch.SF + Pool.Area + Fence + Misc.Val + Yr.Sold  , data = housing_data)
+saleprice_full_model_selected_reduced = lm(SalePrice ~ MS.Zoning + Lot.Area + Street + Lot.Shape + Utilities + Land.Slope + House.Style + Year.Built + Foundation + Location + Heating + Central.Air + Electrical + Gr.Liv.Area + Full.Bath + Bedroom.AbvGr + Kitchen.AbvGr + Kitchen.Qual + TotRms.AbvGrd + Fireplaces + Garage.Area + Paved.Drive + Wood.Deck.SF  + Open.Porch.SF + Pool.Area + Fence + Misc.Val + Yr.Sold  , data = ames_trn_data)
 
 saleprice_selected_reduced_backward_aic = step(saleprice_full_model_selected_reduced, direction = "backward", trace = 0)
 
@@ -345,13 +434,20 @@ plot(SalePrice ~ Neighborhood, data = housing_data, col = "grey", pch = 20, cex 
 
 
 ```{r}
-transformed_model = lm(SalePrice ~ MS.Zoning + log(Lot.Area) + Street + Lot.Shape + Land.Slope + House.Style + I(Year.Built^2) + Foundation + Location + Central.Air + Gr.Liv.Area + Bedroom.AbvGr + Kitchen.AbvGr + Kitchen.Qual + TotRms.AbvGrd + (Fireplaces) + I(Garage.Area^2) + (Wood.Deck.SF) + I(Pool.Area^2) + sqrt(Misc.Val) + Exter.Qual + log(TotRms.AbvGrd) + I(BsmtFin.SF.1^3) + Overall.Qual, data = housing_data)
+
+transformed_model_old = lm(SalePrice ~ MS.Zoning + log(Lot.Area) + Street + Lot.Shape + Land.Slope + House.Style + I(Year.Built^2) + Foundation + Location + Central.Air + Gr.Liv.Area + Bedroom.AbvGr + Kitchen.AbvGr + Kitchen.Qual + TotRms.AbvGrd + (Fireplaces) + I(Garage.Area^2) + (Wood.Deck.SF) + I(Pool.Area^2) + sqrt(Misc.Val) + Exter.Qual + log(TotRms.AbvGrd) + I(BsmtFin.SF.1^3) + Overall.Qual, data = ames_trn_data)
+
+
+transformed_model = lm(SalePrice ~ MS.Zoning + log(Lot.Area) + Street + I(Year.Built^2) + Kitchen.AbvGr + Bedroom.AbvGr + Gr.Liv.Area + log(TotRms.AbvGrd) + (Fireplaces) + I(Garage.Area^2) + Wood.Deck.SF + I(Pool.Area^2) + I(BsmtFin.SF.1^3) + sqrt(Misc.Val) + I(Overall.Qual^5) + I(Gr.Liv.Area^2) + House.Style + Lot.Shape + Land.Slope + Foundation + Exter.Qual + Exter.Cond, data = ames_trn_data)
 
 get_loocv_rmse(saleprice_selected_reduced_backward_aic)
+get_loocv_rmse(transformed_model_old)
 get_loocv_rmse(transformed_model)
 
-sqrt(mean((housing_data$SalePrice - fitted(saleprice_selected_reduced_backward_aic)) ^ 2))
-sqrt(mean((housing_data$SalePrice - fitted(transformed_model)) ^ 2))
+sqrt(mean((ames_trn_data$SalePrice - fitted(saleprice_selected_reduced_backward_aic)) ^ 2))
+sqrt(mean((ames_trn_data$SalePrice - fitted(transformed_model_old)) ^ 2))
+sqrt(mean((ames_trn_data$SalePrice - fitted(transformed_model)) ^ 2))
+
 ```
 
 ```{r}
@@ -375,3 +471,53 @@ qqline(resid(transformed_model), col = "dodgerblue", lwd = 2)
 
 After adding some polynomial and logarithmic kernel transformations to applicable predictor variables, we can see some noticeable improvement in both RMSE and LOOCV-RMSE metrics when comparing to the reduced backward-BIC model from earlier.
 
+```{r}
+formula(bic_for_mod)
+```
+```{r}
+transformed_bic_mod=lm(SalePrice ~ Overall.Qual + Gr.Liv.Area + Neighborhood + Bsmt.Qual + 
+    BsmtFin.SF.1 + Roof.Matl + MS.SubClass + Bsmt.Exposure + 
+    Kitchen.Qual + Overall.Cond + I(Garage.Area^2) + sqrt(Misc.Val) + I(Year.Built^2) + 
+    Exter.Qual + log(Lot.Area) + Screen.Porch + (Fireplaces) + Sale.Condition + 
+    Functional.Num + Bsmt.Full.Bath + Total.Bsmt.SF + Bldg.Type + 
+    Full.Bath + Mas.Vnr.Area + X2nd.Flr.SF,data=ames_trn_data)
+```
+# Model Evaluations
+```{r}
+library(knitr)
+models=list(transformed_model,saleprice_full_model_selected,saleprice_full_model_selected_reduced,saleprice_selected_backward_aic,saleprice_selected_reduced_backward_aic,bic_for_mod,transformed_bic_mod)
+
+RMSE =lapply(lapply(models, compute_rmse), round, 2)
+LOOCV_RMSE= lapply(lapply(models,get_loocv_rmse), round, 2)
+AVG_ERROR= lapply(lapply(models,get_avg_per_error), round, 2)
+ADJ_R2= lapply(lapply(models,get_adj_r2), round, 2)
+BP_TEST= lapply(models,get_bp_decision,alpha=.90)
+SW_TEST= lapply(models,get_sw_decision,alpha=.90)
+
+Models=c("transformed_model","saleprice_full_model_selected","saleprice_full_model_selected_reduced","saleprice_selected_backward_aic","saleprice_selected_reduced_backward_aic","bic_for_mod","transformed_bic_mod")
+evaluation=cbind(Models,RMSE,LOOCV_RMSE,AVG_ERROR,ADJ_R2,BP_TEST,SW_TEST)
+kable(evaluation)
+
+
+hist(resid(transformed_model),
+     xlab   = "Residuals",
+     main   = "transformed_model",
+     col    = "darkorange",
+     border = "dodgerblue",
+     breaks = 100)
+
+
+shapiro.test(resid(transformed_model))
+ks.test(resid(transformed_model), "pnorm")
+
+
+shapiro.test(rnorm(499, mean=0, sd=1000))
+
+```
+
+```{r}
+
+par(mfrow = c(1,2))
+pred_graph(transformed_model,main="Transformed")
+pred_graph(transformed_bic_mod,main="Transformed BIC")
+```

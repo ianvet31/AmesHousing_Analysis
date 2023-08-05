@@ -11,7 +11,7 @@ output:
 
 In this study we will attempt to find the best model to predict Housing Prices in Ames Iowa. Our group has a potential home buyer, and we would like to create a model to help predict home prices, and determine which attributes most contribute to housing prices.
 
-This data set was acquired from Kraggle. It has 79 predictors describing 2,930 houses that were sold in Ames, Iowa between 2006-2010. The `SalePrice` column is the amount the house sold for and will be our response variable.
+This data set was acquired from Kaggle. It has 79 predictors describing 2,930 houses that were sold in Ames, Iowa between 2006-2010. The `SalePrice` column is the amount the house sold for and will be our response variable.
 
 We will attempt to elimate collinearity between predictors, build multiple models, and use various evaluators such as RMSE and Adjusted R^2 to determine the model with the best prediction ability. 
 
@@ -254,7 +254,6 @@ saleprice_selected_backward_aic = step(saleprice_full_model_selected, direction 
 
 ```
 
-
 ```{r}
 # check the number of predictors in the model
 length(coef(saleprice_full_model_selected)) - 1
@@ -285,9 +284,9 @@ anova(saleprice_full_model_selected, saleprice_selected_backward_aic)
 anova(saleprice_selected_backward_aic, saleprice_forward_bic)
 ```
 
-Based on the anova F-tests, the bic forward model is preferred.
+Based on the anova F-tests, the forward BIC model is preferred.
 
-In order to find even better model, the several trail and error methods were performed. Some variable were removed and added manually and tested each model by comparison and checking the adjusted r squared values and other metrics. One of the model from such model building process is as below:
+In order to find an even better model, some trial and error testing was performed. Some variables were added and removed manually, and we tested each model by checking and comparing the adjusted r squared values and other metrics. One of the models that resulted from this process is below:
 ```{r}
 # Even more reduced model by several regression attempts:
 saleprice_full_model_selected_reduced = lm(SalePrice ~ MS.Zoning + Lot.Area + Street + Lot.Shape + Utilities + Land.Slope + House.Style + Year.Built + Foundation + Location + Heating + Central.Air + Electrical + Gr.Liv.Area + Full.Bath + Bedroom.AbvGr + Kitchen.AbvGr + Kitchen.Qual + TotRms.AbvGrd + Fireplaces + Garage.Area + Paved.Drive + Wood.Deck.SF  + Open.Porch.SF + Pool.Area + Fence + Misc.Val + Yr.Sold  , data = ames_trn_data)
@@ -383,7 +382,7 @@ plot(SalePrice ~ Neighborhood, data = housing_data, col = "grey", pch = 20, cex 
      main = "Sale price vs Neighborhood")
 ```
 
-With the help of the plot, trying all possible transformation of the variable and testing how it performs in terms of adjusted r squared and anova test. Two models are selected which are as follow:
+Based on the above visualizations of variable relationships and intuition on the dataset, we can start applying logarithmic and polynomial kernel transformations in order to improve model performance. After some testing, we present the following models that exhibit significant improvements in terms of error metrics:
 
 ```{r}
 
@@ -402,7 +401,8 @@ sqrt(mean((ames_trn_data$SalePrice - fitted(transformed_model)) ^ 2))
 
 # **Results:**
 
-Now, analyzing the models that seems best fit, with the Fitted Vs. Residual plot as well as QQ plot. 
+Now let's analyze how our our models follow the normality and homoscedasticity assumptions of linear regression, using the Fitted Vs. Residuals and Q-Q plots. 
+
 ```{r}
 par(mfrow = c(2,2))
 
@@ -429,9 +429,7 @@ qqline(resid(saleprice_selected_reduced_backward_aic), col = "dodgerblue", lwd =
 
 ```
 
-After adding some polynomial and logarithmic kernel transformations to applicable predictor variables, we can see some noticeable improvement in both RMSE and visual metrics when comparing to the reduced backward-AIC model from earlier.
-
-Now trying some more transformations to the forward BIC model since, it has very good Fitted VS. Residual and QQ Plot.
+Based on a visually assuring performance of the forward BIC, we will take it a step further and apply some similar variable transformations that improved performance on previous model iterations.
 
 ```{r}
 formula(saleprice_forward_bic)
@@ -479,22 +477,8 @@ Models=c("transformed_model","saleprice_full_model_selected","saleprice_full_mod
 evaluation=cbind(Models,RMSE,AVG_ERROR,ADJ_R2)
 kable(evaluation)
 
-
-hist(resid(transformed_model),
-     xlab   = "Residuals",
-     main   = "transformed_model",
-     col    = "darkorange",
-     border = "dodgerblue",
-     breaks = 100)
-
-
-shapiro.test(resid(transformed_model))
-ks.test(resid(transformed_model), "pnorm")
-
-
-shapiro.test(rnorm(499, mean=0, sd=1000))
 ```
-Now, seeing the result of Prediction VS. Actual plot for the two good performing models:
+Now, seeing the result of Predicted VS. Actual plot for our two best performing models:
 
 ```{r}
 par(mfrow = c(1,2))
